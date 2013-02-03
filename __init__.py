@@ -1,4 +1,4 @@
-import first_order_hmm, cross_validation, evaluate
+import zeroth_order_hmm, cross_validation, evaluate
 
 cross_validation.generate_10_fold_corpus("danish.train", "danish")
 
@@ -30,8 +30,8 @@ cross_validation.generate_10_fold_corpus("danish.train", "danish")
 
 avg_accuracy = 0.0
 for section in range(10):
-    first_order_hmm.train("train/danish" + str(section))
-    first_order_hmm.test("test/danish" + str(section), True, "hyp/danish" + str(section))
+    zeroth_order_hmm.train("train/danish" + str(section))
+    zeroth_order_hmm.test("test/danish" + str(section), True, "hyp/danish" + str(section))
     avg_accuracy += evaluate.accuracy("eval/danish" + str(section), "hyp/danish" + str(section))
     
 print "Average accuracy: " + str(avg_accuracy / 10.0) 
