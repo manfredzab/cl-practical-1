@@ -1,34 +1,57 @@
 #!/usr/bin/env python
-import collections
+import collections, math
 
 tag_count = None
+token_count = None
 current_tag_previous_tag_count = None
 token_tag_count = None
+singleton_tag_tag_count = None
+singleton_tag_word_count = None
 
 def train(train_file): 
-    global tag_count, current_tag_previous_tag_count, token_tag_count
+    global tag_count, token_count, current_tag_previous_tag_count, token_tag_count, singleton_tag_tag_count, singleton_tag_word_count 
     
+    # Initialize count dictionaries
     tag_count = collections.defaultdict(int)
+    token_count = collections.defaultdict(int)
     current_tag_previous_tag_count = collections.defaultdict(int)
     token_tag_count = collections.defaultdict(int)
+    singleton_tag_tag_count = collections.defaultdict(int)
+    singleton_tag_word_count = collections.defaultdict(int)
         
-    # Collect counts of (current_tag, previous_tag) pairs
+    # Collect various counts
     for line in open(train_file):
         token_tag_line = line.split()
         
+        # Count t_i's, w_i's and (w_i, t_i) pairs
         for token, tag in [token_tag.rsplit('/', 1) for token_tag in token_tag_line]:
             token_tag_count[(token, tag)] += 1
             tag_count[tag] += 1
+            token_count[token] += 1
         
         tag_line = [token_tag.rsplit('/', 1)[1] for token_tag in token_tag_line]
         # Add '.' as a start symbol
         tag_line.insert(0, '.')
         
+        #  Count (t_i, t_i-1) pairs
         for (current_tag, previous_tag) in zip(tag_line[1:], tag_line[:-1]):
             current_tag_previous_tag_count[(current_tag, previous_tag)] += 1
     
-    # TODO: for correct tagging, append './.' to the beginning of the test file
-
+    
+    # Gather singleton counts
+    for current_tag in tag_count:
+        # Tag-tag singletons
+        for next_tag in tag_count:
+            if (current_tag_previous_tag_count[(next_tag, current_tag)] == 1):
+                singleton_tag_tag_count[current_tag] += 1
+                
+        # Tag-word singletons
+        for current_token in token_count:
+            if (token_tag_count[(current_token, current_tag)] == 1):
+                singleton_tag_word_count[current_tag] += 1
+        
+        
+    
 def test(test_file, readable, output_file):           
     # Output the most frequent tag for each test word. 
     # If the word is unknown, output the most frequent tag
@@ -49,7 +72,7 @@ def test(test_file, readable, output_file):
             
                 if (first_token):
                     for tag in tag_count:
-                        sigma[-1][tag] = (current_tag_previous_tag_count[(tag, '.')] / float(tag_count['.'])) * (token_tag_count[(token, tag)] / float(tag_count[tag])) 
+                        sigma[-1][tag] = Pi(tag) * Pr_tw(token, tag) 
                         psi[-1][tag] = ''
                     
                     first_token = False
@@ -59,7 +82,7 @@ def test(test_file, readable, output_file):
                         max_tag_prob = -1.0;
                         
                         for tag_i in tag_count:
-                            prob = sigma[-2][tag_i] * (current_tag_previous_tag_count[(tag_k, tag_i)] / float(tag_count[tag_i])) * (token_tag_count[(token, tag_k)] / float(tag_count[tag_k]))
+                            prob = sigma[-2][tag_i] * Pr_tt(tag_k, tag_i) *  Pr_tw(token, tag_k)
                             if (prob > max_tag_prob):
                                 max_tag_prob = prob
                                 max_tag = tag_i
@@ -102,6 +125,30 @@ def test(test_file, readable, output_file):
                     output_line.insert(0, max_tag + "\n")
                     
             if readable:
-                print (' '.join(output_line) + "\n"),
+                f_out.write(' '.join(output_line) + "\n"),
             else:
                 f_out.write(''.join(output_line))
+                
+def Pi(tag):
+    return Pr_tt(tag, '.') 
+
+def Pr_tt(t_i, t_i_minus_1):
+    lambda_tt = singleton_tag_tag_count[t_i_minus_1] + math.exp(-100)
+     
+    return (current_tag_previous_tag_count[(t_i, t_i_minus_1)]                        \
+            + lambda_tt * Pr_tt_backoff(t_i, t_i_minus_1))                            \
+            / float(tag_count[t_i_minus_1] + lambda_tt)
+
+def Pr_tw(w_i, t_i):
+    lambda_wt = singleton_tag_word_count[t_i] + math.exp(-100)
+    
+    return (token_tag_count[(w_i, t_i)]                                               \
+            + lambda_wt * Pr_tw_backoff(w_i, t_i))                                    \
+            / float(tag_count[t_i] + lambda_wt)
+
+def Pr_tt_backoff(t_i, t_i_minus_1):
+    return tag_count[t_i] / (float)(len(tag_count))
+
+def Pr_tw_backoff(w_i, t_i):
+    return (token_count[w_i] + 1) / float(len(tag_count) + len(token_count))
+    

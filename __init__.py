@@ -1,4 +1,4 @@
-import zeroth_order_hmm, first_order_hmm, cross_validation, evaluate
+import pos_tagger_unigram, pos_tagger_hmm, cross_validation, evaluate
 
 # Cross-validation corpus generation
 # cross_validation.generate_10_fold_corpus("danish.train", "danish")
@@ -31,13 +31,13 @@ import zeroth_order_hmm, first_order_hmm, cross_validation, evaluate
 #    print
 
 # Training and testing
-#avg_accuracy = 0.0
-#for section in range(10):
-#    zeroth_order_hmm.train("train/danish" + str(section))
-#    zeroth_order_hmm.test("test/danish" + str(section), True, "hyp/danish" + str(section))
-#    avg_accuracy += evaluate.accuracy("eval/danish" + str(section), "hyp/danish" + str(section))
-#    
-#print "Average accuracy: " + str(avg_accuracy / 10.0)
+avg_accuracy = 0.0
+for section in range(10):
+    pos_tagger_hmm.train("train/danish" + str(section))
+    pos_tagger_hmm.test("test/danish" + str(section), True, "hyp/danish" + str(section))
+    avg_accuracy += evaluate.accuracy("eval/danish" + str(section), "hyp/danish" + str(section))
+    
+print "Average accuracy: " + str(avg_accuracy / 10.0)
 
-first_order_hmm.train("train/hmm_testing0")
-first_order_hmm.test("test/hmm_testing0", True, "out.txt")
+#pos_tagger_hmm.train("train/hmm_testing0")
+#pos_tagger_hmm.test("test/hmm_testing0", True, "out.txt")
