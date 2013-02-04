@@ -72,22 +72,22 @@ def test(test_file, readable, output_file):
             
                 if (first_token):
                     for tag in tag_count:
-                        sigma[-1][tag] = Pi(tag) * Pr_tw(token, tag) 
+                        sigma[-1][tag] = log_pi(tag) + log_pr_tw(token, tag) 
                         psi[-1][tag] = ''
                     
                     first_token = False
                 else:
                     for tag_k in tag_count:
                         max_tag = None
-                        max_tag_prob = -1.0;
+                        log_max_tag_prob = float("-inf")
                         
                         for tag_i in tag_count:
-                            prob = sigma[-2][tag_i] * Pr_tt(tag_k, tag_i) *  Pr_tw(token, tag_k)
-                            if (prob > max_tag_prob):
-                                max_tag_prob = prob
+                            log_prob = sigma[-2][tag_i] + log_pr_tt(tag_k, tag_i) + log_pr_tw(token, tag_k)
+                            if (log_prob > log_max_tag_prob):
+                                log_max_tag_prob = log_prob
                                 max_tag = tag_i
                         
-                        sigma[-1][tag_k] = max_tag_prob  
+                        sigma[-1][tag_k] = log_max_tag_prob  
                         psi[-1][tag_k] = max_tag
                         
             
@@ -104,12 +104,12 @@ def test(test_file, readable, output_file):
             for token in tokenized_line:               
                 
                 if (last_token):
-                    max_prob = -1.0
+                    log_max_tag_prob = float("-inf")
                     
                     for tag in tag_count:
-                        prob = sigma[-1][tag]                        
-                        if (prob > max_prob):
-                            max_prob = prob
+                        log_prob = sigma[-1][tag]                        
+                        if (log_prob > log_max_tag_prob):
+                            log_max_tag_prob = log_prob
                             max_tag = tag
                                    
                     last_token = False                     
@@ -129,26 +129,24 @@ def test(test_file, readable, output_file):
             else:
                 f_out.write(''.join(output_line))
                 
-def Pi(tag):
-    return Pr_tt(tag, '.') 
+def log_pi(tag):
+    return log_pr_tt(tag, '.') 
 
-def Pr_tt(t_i, t_i_minus_1):
+def log_pr_tt(t_i, t_i_minus_1):
     lambda_tt = singleton_tag_tag_count[t_i_minus_1] + math.exp(-100)
      
-    return (current_tag_previous_tag_count[(t_i, t_i_minus_1)]                        \
-            + lambda_tt * Pr_tt_backoff(t_i, t_i_minus_1))                            \
-            / float(tag_count[t_i_minus_1] + lambda_tt)
+    return math.log(current_tag_previous_tag_count[(t_i, t_i_minus_1)] + lambda_tt * pr_tt_backoff(t_i, t_i_minus_1)) \
+           - math.log(tag_count[t_i_minus_1] + lambda_tt)
 
-def Pr_tw(w_i, t_i):
+def log_pr_tw(w_i, t_i):
     lambda_wt = singleton_tag_word_count[t_i] + math.exp(-100)
     
-    return (token_tag_count[(w_i, t_i)]                                               \
-            + lambda_wt * Pr_tw_backoff(w_i, t_i))                                    \
-            / float(tag_count[t_i] + lambda_wt)
+    return math.log(token_tag_count[(w_i, t_i)] + lambda_wt * pr_tw_backoff(w_i, t_i))                                    \
+           - math.log(tag_count[t_i] + lambda_wt)
 
-def Pr_tt_backoff(t_i, t_i_minus_1):
-    return tag_count[t_i] / (float)(len(tag_count))
+def pr_tt_backoff(t_i, t_i_minus_1):
+    return tag_count[t_i] / float(len(tag_count) - 1)
 
-def Pr_tw_backoff(w_i, t_i):
-    return (token_count[w_i] + 1) / float(len(tag_count) + len(token_count))
+def pr_tw_backoff(w_i, t_i):
+    return (token_count[w_i] + 1) / float(len(tag_count) + len(token_count) - 1)
     
