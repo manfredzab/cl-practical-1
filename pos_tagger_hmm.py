@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 import collections, math
 
+EPSILON = math.exp(-30) 
+
 tag_count = None
 token_count = None
+token_total = 0
 current_tag_previous_tag_count = None
 token_tag_count = None
 singleton_tag_tag_count = None
 singleton_tag_word_count = None
 
 def train(train_file): 
-    global tag_count, token_count, current_tag_previous_tag_count, token_tag_count, singleton_tag_tag_count, singleton_tag_word_count 
+    global tag_count, token_count, token_total, current_tag_previous_tag_count, token_tag_count, singleton_tag_tag_count, singleton_tag_word_count 
     
     # Initialize count dictionaries
     tag_count = collections.defaultdict(int)
@@ -21,6 +24,9 @@ def train(train_file):
         
     # Collect various counts
     for line in open(train_file):
+        # Add beginning-of-sentence symbol
+        line = "###/### " + line
+        
         token_tag_line = line.split()
         
         # Count t_i's, w_i's and (w_i, t_i) pairs
@@ -28,12 +34,14 @@ def train(train_file):
             token_tag_count[(token, tag)] += 1
             tag_count[tag] += 1
             token_count[token] += 1
+            token_total += 1       
         
-        tag_line = [token_tag.rsplit('/', 1)[1] for token_tag in token_tag_line]
-        # Add '.' as a start symbol
-        tag_line.insert(0, '.')
-        
+        # Add end-of-sentence symbol
+        token_tag_line.append("###/###")
+                
         #  Count (t_i, t_i-1) pairs
+        tag_line = [token_tag.rsplit('/', 1)[1] for token_tag in token_tag_line]        
+        
         for (current_tag, previous_tag) in zip(tag_line[1:], tag_line[:-1]):
             current_tag_previous_tag_count[(current_tag, previous_tag)] += 1
     
@@ -50,8 +58,7 @@ def train(train_file):
             if (token_tag_count[(current_token, current_tag)] == 1):
                 singleton_tag_word_count[current_tag] += 1
         
-        
-    
+            
 def test(test_file, readable, output_file):           
     # Output the most frequent tag for each test word. 
     # If the word is unknown, output the most frequent tag
@@ -60,6 +67,8 @@ def test(test_file, readable, output_file):
             f_out.write("Tag\n")
             
         for line in open(test_file):
+            line = "### " + line + " ###"
+            
             sigma = []
             psi = []
             
@@ -119,34 +128,43 @@ def test(test_file, readable, output_file):
                 
                 i = i + 1
                 
-                if readable:
-                    output_line.insert(0, "%s/%s" % (token, max_tag))
-                else:
-                    output_line.insert(0, max_tag + "\n")
+                if (token != "###"): 
+                    if readable:
+                        output_line.insert(0, "%s/%s" % (token, max_tag))
+                    else:
+                        output_line.insert(0, max_tag + "\n")
                     
             if readable:
                 f_out.write(' '.join(output_line) + "\n"),
             else:
                 f_out.write(''.join(output_line))
                 
+                
 def log_pi(tag):
     return log_pr_tt(tag, '.') 
 
+
 def log_pr_tt(t_i, t_i_minus_1):
-    lambda_tt = singleton_tag_tag_count[t_i_minus_1] + math.exp(-100)
+    lambda_tt = singleton_tag_tag_count[t_i_minus_1] + EPSILON
      
     return math.log(current_tag_previous_tag_count[(t_i, t_i_minus_1)] + lambda_tt * pr_tt_backoff(t_i, t_i_minus_1)) \
            - math.log(tag_count[t_i_minus_1] + lambda_tt)
 
+
 def log_pr_tw(w_i, t_i):
-    lambda_wt = singleton_tag_word_count[t_i] + math.exp(-100)
+    if (t_i == "###"):
+        return math.log(1.0 if (w_i == "###") else EPSILON)
     
-    return math.log(token_tag_count[(w_i, t_i)] + lambda_wt * pr_tw_backoff(w_i, t_i))                                    \
+    lambda_wt = singleton_tag_word_count[t_i] + EPSILON
+    
+    return math.log(token_tag_count[(w_i, t_i)] + lambda_wt * pr_tw_backoff(w_i, t_i)) \
            - math.log(tag_count[t_i] + lambda_wt)
 
+
 def pr_tt_backoff(t_i, t_i_minus_1):
-    return tag_count[t_i] / float(len(tag_count) - 1)
+    return tag_count[t_i] / float(token_total)
+
 
 def pr_tw_backoff(w_i, t_i):
-    return (token_count[w_i] + 1) / float(len(tag_count) + len(token_count) - 1)
-    
+    return (token_count[w_i] + 1) / float(token_total + len(token_count))    
+

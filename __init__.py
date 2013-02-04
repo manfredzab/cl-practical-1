@@ -39,5 +39,8 @@ for section in range(10):
     
 print "Average accuracy: " + str(avg_accuracy / 10.0)
 
+#pos_tagger_hmm.train("danish.train")
+#pos_tagger_hmm.test("danish.test", False, "output.csv")
+
 #pos_tagger_hmm.train("train/hmm_testing0")
 #pos_tagger_hmm.test("test/hmm_testing0", True, "out.txt")
